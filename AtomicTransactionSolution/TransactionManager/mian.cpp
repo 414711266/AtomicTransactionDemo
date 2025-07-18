@@ -7,40 +7,50 @@
 
 #include <iostream>
 #include <string>
-#include <vector>
 
-// 这是一个简单的文档类，代表了关心的对象 (Originator)
-class SimpleDocument {
+ // Originator: 需要被备份状态的对象
+class Document {
 public:
-    std::string content;
+	std::string content;
 
-    void print() const {
-        std::cout << "Document content: \"" << content << "\"" << std::endl;
-    }
+	// 创建一个备忘录 (Memento)，包含当前需要保存的状态
+	std::string createMemento() const {
+		return content;
+	}
+
+	// 从备忘录中恢复状态
+	void restoreFromMemento(const std::string& memento) {
+		content = memento;
+	}
+
+	void print() const {
+		std::cout << "Document content: \"" << content << "\"" << std::endl;
+	}
 };
 
 int main() {
-    // 1. 创建一个文档对象，并设置初始状态
-    SimpleDocument doc;
-    doc.content = "Hello, World!";
-    std::cout << "--- Initial State ---" << std::endl;
-    doc.print();
+	// Caretaker (负责人) 的角色由 main 函数扮演
 
-    // 2. 修改前，先手动备份它的状态
-    //    这里的 backup_content 就是最原始的 "Memento" (备忘录)
-    std::string backup_content = doc.content;
-    std::cout << "\n...State saved manually." << std::endl;
+	// 1. 创建 Originator
+	Document doc;
+	doc.content = "Version 1";
+	std::cout << "--- Initial State ---" << std::endl;
+	doc.print();
 
-    // 3. 修改文档内容
-    doc.content = "Hello, WPS DataLayer!";
-    std::cout << "\n--- Modified State ---" << std::endl;
-    doc.print();
+	// 2. Caretaker 决定要进行一个危险操作(修改)，于是在操作前，向 Originator 索要一个 Memento
+	std::cout << "\nCaretaker: 'I'm about to change you, Document! Give me a memento first.'" << std::endl;
+	std::string memento = doc.createMemento(); // 得到备忘录
 
-    // 4. 实现 "Undo" 这个操作
-    //    我们手动从备份中恢复状态
-    doc.content = backup_content;
-    std::cout << "\n--- After Manual Undo ---" << std::endl;
-    doc.print();
+	// 3. Originator 的状态被改变
+	doc.content = "Version 2";
+	std::cout << "\n--- State Modified ---" << std::endl;
+	doc.print();
 
-    return 0;
+	// 4. 用户请求撤销。Caretaker 将之前保管的 Memento 还给 Originator
+	std::cout << "\nCaretaker: 'Undo! Document, restore yourself using this memento.'" << std::endl;
+	doc.restoreFromMemento(memento);
+	std::cout << "\n--- State Restored ---" << std::endl;
+	doc.print();
+
+	return 0;
 }
