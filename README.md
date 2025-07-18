@@ -111,8 +111,136 @@ int main() {
 
 ###  2：引入负责人 (The First DataLayer)
 
-- 目标： 创建一个专门的类（KDataLayer 的雏形）来管理历史状态，实现一个简单的 Commit 和 Undo。
-- 组件： KDataLayer_V1，Document。
+#### 需求
+
+希望能像真正的编辑器一样，连续撤销好几步操作，而不是只能撤销一次。
+
+**目标：**
+
+1. 创建一个专门的类来管理历史记录。
+2. 实现多步 Undo 功能。
+
+**设计思路 (备忘录模式的演进):**
+
+1. **Caretaker (负责人) 的进化：** 我们不再让 main 函数承担保管责任。我们将创建一个新的类，就叫 HistoryManager。它的核心职责就是维护一个“备忘录列表”。
+2. **Memento (备忘录) 的容器：** HistoryManager 内部需要一个容器来存储一系列的备忘录。std::vector 是一个非常自然的选择。
+3. **Undo 逻辑：** 当需要 Undo 时，HistoryManager 从它的列表中取出**最后一个**备忘录，并用它来恢复 Document 的状态，然后将这个备忘录从列表中移除。
+
+```c++
+#include <iostream>
+#include <string>
+#include <vector> // 需要 vector 来存储历史记录
+
+// Originator: 需要被备份状态的对象 (和之前一样，没有变化)
+class Document {
+public:
+    std::string content;
+
+    // 创建一个备忘录 (Memento)，包含当前需要保存的状态
+    std::string createMemento() const {
+        return content;
+    }
+
+    // 从备忘录中恢复状态
+    void restoreFromMemento(const std::string& memento) {
+        content = memento;
+    }
+
+    void print() const {
+        std::cout << "Document content: \"" << content << "\"" << std::endl;
+    }
+};
+
+// Caretaker: 负责人，现在是一个专门的类
+class HistoryManager {
+private:
+    Document& m_doc; // 负责人需要知道它在为哪个文档服务
+    std::vector<std::string> m_history; // 用一个 vector 来存储备忘录列表
+
+public:
+    // 构造函数，传入它需要管理的文档
+    HistoryManager(Document& doc) : m_doc(doc) {}
+
+    // 备份当前状态
+    void backup() {
+        std::cout << "HistoryManager: Backing up current state..." << std::endl;
+        m_history.push_back(m_doc.createMemento());
+    }
+
+    // 撤销操作
+    void undo() {
+        if (m_history.empty()) {
+            std::cout << "HistoryManager: No history to undo." << std::endl;
+            return;
+        }
+
+        // 1. 从历史记录中取出最后一个备忘录
+        std::string lastMemento = m_history.back();
+        m_history.pop_back(); // 从历史记录中移除
+
+        // 2. 用这个备忘录恢复文档
+        std::cout << "HistoryManager: Undoing..." << std::endl;
+        m_doc.restoreFromMemento(lastMemento);
+    }
+};
+
+
+int main() {
+    // 1. 创建 Originator 和 Caretaker
+    Document doc;
+    HistoryManager history(doc);
+
+    // --- 流程开始 ---
+    // 操作 1: 设置初始内容
+    doc.content = "Version 1";
+    history.backup(); // 备份 V1
+    doc.print();
+
+    // 操作 2: 修改内容
+    doc.content = "Version 2";
+    history.backup(); // 备份 V2
+    doc.print();
+
+    // 操作 3: 再次修改内容
+    doc.content = "Version 3";
+    // 注意：这里我们不备份 V3，因为我们即将修改它
+    // 历史记录里现在有 [V1, V2]
+    std::cout << "\n--- Current State ---" << std::endl;
+    doc.print();
+
+
+    // --- 开始撤销 ---
+    std::cout << "\n--- Start Undoing ---" << std::endl;
+
+    // 第一次撤销：应该恢复到 V2
+    history.undo();
+    doc.print(); // 期望输出 "Version 2"
+
+    // 第二次撤销：应该恢复到 V1
+    history.undo();
+    doc.print(); // 期望输出 "Version 1"
+
+    // 第三次撤销：历史记录已空
+    history.undo();
+    doc.print(); // 期望输出 "Version 1"，并提示没有历史记录
+
+    return 0;
+}
+```
+
+#### 局限性
+
+局限1：
+
+没有 Redo (重做) 功能。 在 undo() 方法中，我们直接用 pop_back() 把备忘录丢弃了。一旦撤销，就再也回不去了。
+
+局限2：
+
+一个负责人只能管一个对象。 HistoryManager 在构造时就绑定了一个 Document。如果我们的应用有 Document 和 StyleSheet 两个对象，我想把它们俩的修改（比如，改了文字，又改了颜色）看作一个操作来一起撤销，现在的架构做不到。
+
+局限3：
+
+备份时机是手动的。 我们仍然需要在每次修改后，手动调用 history.backup()。这很麻烦且容易出错。如果程序员忘了调用，撤销功能就会出 bug。
 
 ###  3：支持多对象事务 (The Command Pattern)
 
