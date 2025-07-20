@@ -1,106 +1,146 @@
-/*
- * @author： Karl
- * @date：   2025年7月18日
- *
- * 事务处理demo
- */
-
 #include <iostream>
 #include <string>
-#include <vector> // 需要 vector 来存储历史记录
+#include <vector>
+#include <memory> // For std::shared_ptr
 
- // Originator: 需要被备份状态的对象 (和之前一样，没有变化)
+// 前向声明
+class Command;
+
+// 通用数据层，即新的 HistoryManager，我们开始叫它 DataLayer
+class DataLayer {
+private:
+    std::vector<std::shared_ptr<Command>> m_history;
+    int m_currentVersion = -1; // -1 表示在所有历史记录之前 (初始状态)
+
+public:
+    void addCommand(std::shared_ptr<Command> command);
+    void undo();
+    void redo();
+};
+
+// Command 接口: 定义了所有命令必须实现的行为
+class Command {
+public:
+    virtual ~Command() = default;
+    virtual void execute() = 0; // 执行/重做
+    virtual void unexecute() = 0; // 撤销
+};
+
+// Originator: 我们的文档类
 class Document {
 public:
     std::string content;
-
-    // 创建一个备忘录 (Memento)，包含当前需要保存的状态
-    std::string createMemento() const {
-        return content;
-    }
-
-    // 从备忘录中恢复状态
-    void restoreFromMemento(const std::string& memento) {
-        content = memento;
-    }
-
     void print() const {
         std::cout << "Document content: \"" << content << "\"" << std::endl;
     }
 };
 
-// Caretaker: 负责人，现在是一个专门的类
-class HistoryManager {
+// ConcreteCommand: 修改文档内容的具体命令
+class ChangeContentCommand : public Command {
 private:
-    Document& m_doc; // 负责人需要知道它在为哪个文档服务
-    std::vector<std::string> m_history; // 用一个 vector 来存储备忘录列表
+    Document& m_doc;
+    std::string m_oldContent;
+    std::string m_newContent;
 
 public:
-    // 构造函数，传入它需要管理的文档
-    HistoryManager(Document& doc) : m_doc(doc) {}
-
-    // 备份当前状态
-    void backup() {
-        std::cout << "HistoryManager: Backing up current state..." << std::endl;
-        m_history.push_back(m_doc.createMemento());
+    ChangeContentCommand(Document& doc, const std::string& newContent)
+        : m_doc(doc), m_newContent(newContent) {
+        // 在命令创建时，就保存好旧状态
+        m_oldContent = doc.content;
     }
 
-    // 撤销操作
-    void undo() {
-        if (m_history.empty()) {
-            std::cout << "HistoryManager: No history to undo." << std::endl;
-            return;
-        }
+    // 执行/重做：将文档内容设置为新内容
+    void execute() override {
+        m_doc.content = m_newContent;
+    }
 
-        // 1. 从历史记录中取出最后一个备忘录
-        std::string lastMemento = m_history.back();
-        m_history.pop_back(); // 从历史记录中移除
-
-        // 2. 用这个备忘录恢复文档
-        std::cout << "HistoryManager: Undoing..." << std::endl;
-        m_doc.restoreFromMemento(lastMemento);
+    // 撤销：将文档内容恢复为旧内容
+    void unexecute() override {
+        m_doc.content = m_oldContent;
     }
 };
 
+// 在这里实现 DataLayer 的方法
+void DataLayer::addCommand(std::shared_ptr<Command> command) {
+    // 如果在 undo 之后执行了新命令，清除所有未来的 redo 历史
+    if (m_currentVersion + 1 < m_history.size()) {
+        m_history.resize(m_currentVersion + 1);
+    }
+
+    command->execute(); // 立即执行新命令
+    m_history.push_back(command);
+    m_currentVersion++;
+    std::cout << "DataLayer: Command executed and added to history. "
+        << "Current version: " << m_currentVersion << std::endl;
+}
+
+void DataLayer::undo() {
+    if (m_currentVersion < 0) {
+        std::cout << "DataLayer: Cannot undo. At initial state." << std::endl;
+        return;
+    }
+    std::cout << "DataLayer: Undoing..." << std::endl;
+    m_history[m_currentVersion]->unexecute();
+    m_currentVersion--;
+}
+
+void DataLayer::redo() {
+    if (m_currentVersion + 1 >= m_history.size()) {
+        std::cout << "DataLayer: Cannot redo. At latest state." << std::endl;
+        return;
+    }
+    std::cout << "DataLayer: Redoing..." << std::endl;
+    m_currentVersion++;
+    m_history[m_currentVersion]->execute();
+}
+
+// Helper function to create and add command
+void changeContent(DataLayer& dl, Document& doc, const std::string& newContent) {
+    auto cmd = std::make_shared<ChangeContentCommand>(doc, newContent);
+    dl.addCommand(cmd);
+}
 
 int main() {
-    // 1. 创建 Originator 和 Caretaker
+    DataLayer dataLayer;
     Document doc;
-    HistoryManager history(doc);
-
-    // --- 流程开始 ---
-    // 操作 1: 设置初始内容
-    doc.content = "Version 1";
-    history.backup(); // 备份 V1
+    doc.content = "Initial Version";
+    std::cout << "--- Start ---" << std::endl;
     doc.print();
 
-    // 操作 2: 修改内容
-    doc.content = "Version 2";
-    history.backup(); // 备份 V2
+    // 操作1: 修改为 Version 1
+    std::cout << "\n--- Action 1 ---" << std::endl;
+    changeContent(dataLayer, doc, "Version 1");
     doc.print();
 
-    // 操作 3: 再次修改内容
-    doc.content = "Version 3";
-    // 注意：这里我们不备份 V3，因为我们即将修改它
-    // 历史记录里现在有 [V1, V2]
-    std::cout << "\n--- Current State ---" << std::endl;
+    // 操作2: 修改为 Version 2
+    std::cout << "\n--- Action 2 ---" << std::endl;
+    changeContent(dataLayer, doc, "Version 2");
     doc.print();
 
+    // --- 开始撤销/重做 ---
+    std::cout << "\n--- Testing Undo/Redo ---" << std::endl;
 
-    // --- 开始撤销 ---
-    std::cout << "\n--- Start Undoing ---" << std::endl;
+    // Undo 1: 恢复到 V1
+    dataLayer.undo();
+    doc.print(); // 期望: Version 1
 
-    // 第一次撤销：应该恢复到 V2
-    history.undo();
-    doc.print(); // 期望输出 "Version 2"
+    // Undo 2: 恢复到 Initial
+    dataLayer.undo();
+    doc.print(); // 期望: Initial Version
 
-    // 第二次撤销：应该恢复到 V1
-    history.undo();
-    doc.print(); // 期望输出 "Version 1"
+    // Redo 1: 前进到 V1
+    dataLayer.redo();
+    doc.print(); // 期望: Version 1
 
-    // 第三次撤销：历史记录已空
-    history.undo();
-    doc.print(); // 期望输出 "Version 1"，并提示没有历史记录
+    // 此时历史状态是 V1，我们执行一个新操作
+    std::cout << "\n--- New Action after Undo ---" << std::endl;
+    changeContent(dataLayer, doc, "Version 3 (new branch)");
+    doc.print();
+
+    // 尝试 Redo: 应该失败，因为 V2 的历史已被覆盖
+    std::cout << "\n--- Trying to Redo to V2 ---" << std::endl;
+    dataLayer.redo(); // 期望: Cannot redo
+    doc.print();
 
     return 0;
 }
