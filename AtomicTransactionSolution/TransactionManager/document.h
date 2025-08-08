@@ -4,12 +4,12 @@
 #include <iostream>
 #include <string>
 
-// Originator: 我们的文档类
+// Originator: 文档类
 class Document {
 public:
 	std::string content;
 	void print() const {
-		std::cout << "Document content: \"" << content << "\"" << std::endl;
+		std::cout << "文档内容: \"" << content << "\"" << std::endl;
 	}
 };
 

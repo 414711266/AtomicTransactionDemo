@@ -244,14 +244,239 @@ int main() {
 
 ###  3：支持多对象事务 (The Command Pattern)
 
-- 目标： 让 DataLayer 能够在一个“事务”中记录来自多个对象的变化。
-- 组件： 引入 DLCommand 结构体，改造 KDataLayer。
+#### 需求
 
+目标： 让 DataLayer 能够在一个“事务”中记录来自多个对象的变化。
 
+- HistoryManager 不需要知道它管理的是 Document 还是 Style
+- 备忘录 Memento 本身也存在类型问题（Document 的是 string，Style 的可能是个结构体）
+- 引入一个中间层：**命令（Command）**。
 
+实现redo
 
+- 不再用 pop_back 删除历史记录。引入一个整数 m_currentVersion 作为游标，指向历史列表中的当前状态
+- **Undo**：游标向前移动 (--m_currentVersion)，然后执行该位置命令的 undo。
+- **Redo**：游标向后移动 (++m_currentVersion)，然后执行该位置命令的 execute (或 redo)。
+- **新操作**：如果在游标之后还有历史记录（意味着用户先 undo 了几次），此时再执行一个新操作，那么游标之后的所有历史记录都将被清除。
 
+#### document
 
+```c++
+// document.h
+#ifndef DOCUMENT_H
+#define DOCUMENT_H
+
+#include <iostream>
+#include <string>
+
+// Originator: 我们的文档类
+class Document {
+public:
+    std::string content;
+    void print() const {
+        std::cout << "Document content: \"" << content << "\"" << std::endl;
+    }
+};
+
+#endif // DOCUMENT_H
+```
+
+#### command.h
+
+```c++
+// command.h
+#ifndef COMMAND_H
+#define COMMAND_H
+
+#include "document.h" // 需要知道 Document 类的定义
+#include <string>
+#include <memory>
+
+// Command 接口: 定义了所有命令必须实现的行为
+class Command {
+public:
+    virtual ~Command() = default;
+    virtual void execute() = 0; // 执行/重做
+    virtual void unexecute() = 0; // 撤销
+};
+
+// ConcreteCommand: 修改文档内容的具体命令
+class ChangeContentCommand : public Command {
+private:
+    Document& m_doc;
+    std::string m_oldContent;
+    std::string m_newContent;
+
+public:
+    ChangeContentCommand(Document& doc, const std::string& newContent);
+
+    void execute() override;
+    void unexecute() override;
+};
+
+#endif // COMMAND_H
+```
+
+#### **command.cpp**
+
+```C++
+// command.cpp
+#include "command.h"
+
+ChangeContentCommand::ChangeContentCommand(Document& doc, const std::string& newContent)
+    : m_doc(doc), m_newContent(newContent) {
+    // 在命令创建时，就保存好旧状态
+    m_oldContent = doc.content;
+}
+
+// 执行/重做：将文档内容设置为新内容
+void ChangeContentCommand::execute() {
+    m_doc.content = m_newContent;
+}
+
+// 撤销：将文档内容恢复为旧内容
+void ChangeContentCommand::unexecute() {
+    m_doc.content = m_oldContent;
+}
+```
+
+#### **datalayer.h**
+
+```c++
+// datalayer.h
+#ifndef DATALAYER_H
+#define DATALAYER_H
+
+#include <vector>
+#include <memory>
+
+// 前向声明 Command，避免在头文件中引入 command.h
+// 这是一个优化，因为 DataLayer 的接口只需要知道 Command 是一个类型，
+// 而不需要知道它的具体实现。这可以减少编译依赖。
+class Command;
+
+// 通用数据层，我们的 Undo/Redo 管理器
+class DataLayer {
+private:
+    std::vector<std::shared_ptr<Command>> m_history;
+    int m_currentVersion; // 游标
+
+public:
+    DataLayer(); // 构造函数
+
+    void addCommand(std::shared_ptr<Command> command);
+    void undo();
+    void redo();
+};
+
+#endif // DATALAYER_H
+```
+
+####  **datalayer.cpp**
+
+```c++
+// datalayer.cpp
+#include "datalayer.h"
+#include "command.h" // 在这里才需要 Command 的完整定义
+#include <iostream>
+
+DataLayer::DataLayer() : m_currentVersion(-1) {}
+
+void DataLayer::addCommand(std::shared_ptr<Command> command) {
+    if (m_currentVersion + 1 < m_history.size()) {
+        m_history.resize(m_currentVersion + 1);
+    }
+    command->execute();
+    m_history.push_back(command);
+    m_currentVersion++;
+    std::cout << "DataLayer: Command executed and added. History size: "
+              << m_history.size() << ", Version: " << m_currentVersion << std::endl;
+}
+
+void DataLayer::undo() {
+    if (m_currentVersion < 0) {
+        std::cout << "DataLayer: Cannot undo. At initial state." << std::endl;
+        return;
+    }
+    std::cout << "DataLayer: Undoing..." << std::endl;
+    m_history[m_currentVersion]->unexecute();
+    m_currentVersion--;
+}
+
+void DataLayer::redo() {
+    if (m_currentVersion + 1 >= m_history.size()) {
+        std::cout << "DataLayer: Cannot redo. At latest state." << std::endl;
+        return;
+    }
+    std::cout << "DataLayer: Redoing..." << std::endl;
+    m_currentVersion++;
+    m_history[m_currentVersion]->execute();
+}
+```
+
+#### **main.cpp**
+
+```C++
+// main.cpp
+#include "datalayer.h"
+#include "command.h"
+#include "document.h"
+
+// Helper function to create and add command
+void changeContent(DataLayer& dl, Document& doc, const std::string& newContent) {
+    auto cmd = std::make_shared<ChangeContentCommand>(doc, newContent);
+    dl.addCommand(cmd);
+}
+
+int main() {
+    DataLayer dataLayer;
+    Document doc;
+    doc.content = "Initial Version";
+    std::cout << "--- Start ---" << std::endl;
+    doc.print();
+
+    // 操作1: 修改为 Version 1
+    std::cout << "\n--- Action 1 ---" << std::endl;
+    changeContent(dataLayer, doc, "Version 1");
+    doc.print();
+
+    // 操作2: 修改为 Version 2
+    std::cout << "\n--- Action 2 ---" << std::endl;
+    changeContent(dataLayer, doc, "Version 2");
+    doc.print();
+
+    // --- 开始撤销/重做 ---
+    std::cout << "\n--- Testing Undo/Redo ---" << std::endl;
+    
+    // Undo 1: 恢复到 V1
+    dataLayer.undo();
+    doc.print();
+
+    // Undo 2: 恢复到 Initial
+    dataLayer.undo();
+    doc.print();
+
+    // Redo 1: 前进到 V1
+    dataLayer.redo();
+    doc.print();
+
+    // 此时历史状态是 V1，我们执行一个新操作
+    std::cout << "\n--- New Action after Undo ---" << std::endl;
+    changeContent(dataLayer, doc, "Version 3 (new branch)");
+    doc.print();
+
+    // 尝试 Redo: 应该失败，因为 V2 的历史已被覆盖
+    std::cout << "\n--- Trying to Redo to V2 ---" << std::endl;
+    dataLayer.redo();
+    doc.print();
+
+    return 0;
+}
+```
+
+#### 代码分析
+
+#### 局限性
 
 
 
