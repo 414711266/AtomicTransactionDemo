@@ -139,7 +139,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="command.cpp" />
+    <ClCompile Include="datalayer.cpp" />
     <ClCompile Include="mian.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="command.h" />
+    <ClInclude Include="datalayer.h" />
+    <ClInclude Include="document.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

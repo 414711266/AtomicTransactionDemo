@@ -247,6 +247,14 @@ int main() {
 - 目标： 让 DataLayer 能够在一个“事务”中记录来自多个对象的变化。
 - 组件： 引入 DLCommand 结构体，改造 KDataLayer。
 
+
+
+
+
+
+
+
+
 ###  4：自动化备份 (The "Atom" Magic)
 
 - 目标： 让对象在被修改时，能“自动”通知 DataLayer 并创建备份。这是整个框架的精髓所在。
