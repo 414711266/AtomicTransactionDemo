@@ -5,9 +5,6 @@
 #include <vector>
 #include <memory>
 
-// 前向声明 Command，避免在头文件中引入 command.h
-// 这是一个优化，因为 DataLayer 的接口只需要知道 Command 是一个类型，
-// 而不需要知道它的具体实现。这可以减少编译依赖。
 class Command;
 
 // 通用数据层，我们的 Undo/Redo 管理器

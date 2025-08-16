@@ -259,6 +259,8 @@ int main() {
 - **Redo**：游标向后移动 (++m_currentVersion)，然后执行该位置命令的 execute (或 redo)。
 - **新操作**：如果在游标之后还有历史记录（意味着用户先 undo 了几次），此时再执行一个新操作，那么游标之后的所有历史记录都将被清除。
 
+使用，**接口**、**多态**、**命令模式**
+
 #### document
 
 ```c++
@@ -476,9 +478,15 @@ int main() {
 
 #### 代码分析
 
+通过创建文档对象 Document 管理原始数据内容。然后创建datalayer对象管理命令ChangeContentCommand。将每一次对文档的操作都抽象为命令ChangeContentCommand。这样撤销与重做的行为就变成了执行这条命令或是执行上一条命令。通过将每次对文档的操作都作为命令存储，完成了撤销与重做功能的实现
+
 #### 局限性
 
+为了修改一下 Document 的内容，我们不能直接写 doc.content = "新内容";。而是必须“规规矩矩”地调用一个辅助函数 changeContent(...)，在这个函数里，我们手动地 std::make_shared<ChangeContentCommand>(...) 创建了一个命令对象，然后手动地 dl.addCommand(cmd) 把它交给数据层。
 
+Document 对象和 DataLayer 对象是完全独立的两个实体。它们之间没有任何内在的联系。只有在 main 函数里，我们才把它们“撮合”到一起。
+
+如果一个 Document 对象被多个 DataLayer 管理怎么办？或者更重要的是，如果一个对象在创建时就注定要被某个 DataLayer 管理，为什么不直接让它们“绑定”在一起？
 
 ###  4：自动化备份 (The "Atom" Magic)
 

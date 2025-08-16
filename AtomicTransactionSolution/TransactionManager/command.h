@@ -1,8 +1,7 @@
-// command.h
 #ifndef COMMAND_H
 #define COMMAND_H
 
-#include "document.h" // 需要知道 Document 类的定义
+#include "document.h"
 #include <string>
 #include <memory>
 
