@@ -75,11 +75,14 @@ void DataLayer::writeLockAtom(IKAtomData* pAtom) {
 	}
 
 	// 检查这个原子在当前事务中是否已经被修改过
+	// 这里需要把 Command* 向下转型为 AtomCommand* 才能调用 getAtom
 	auto it = std::find_if(m_transCommands.begin(), m_transCommands.end(),
-		[&](const std::shared_ptr<Command>& cmd) {
-			// 需要一种方式来识别命令对应的原子，这里简化处理
-			// 真实的实现会更复杂，这里假设一个事务只修改一个原子一次
-			// 为了演示，我们简化为每次都创建新命令
+		[&](const std::shared_ptr<Command>& cmd) -> bool { // 明确指定返回 bool
+			AtomCommand* pAtomCmd = dynamic_cast<AtomCommand*>(cmd.get());
+			if (pAtomCmd) {
+				return pAtomCmd->getAtom() == pAtom; // 正确的比较和返回
+			}
+			return false;
 		});
 
 	if (it != m_transCommands.end()) {

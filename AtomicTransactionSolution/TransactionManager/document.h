@@ -2,9 +2,9 @@
 #ifndef DOCUMENT_H
 #define DOCUMENT_H
 
-#include "command.h" // ÎªÁË¼Ì³Ð IKAtomData
 #include <string>
 #include "command.h"
+
 class Document : public IKAtomData {
 private:
 	std::string m_content;

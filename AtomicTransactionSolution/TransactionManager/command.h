@@ -45,6 +45,9 @@ public:
 
 	void execute() override;
 	void unexecute() override;
+
+	// 新增：获取命令关联的原子
+	IKAtomData* getAtom() const;
 };
 
 // ConcreteCommand: 修改文档内容的具体命令

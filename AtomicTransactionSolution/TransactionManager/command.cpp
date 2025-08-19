@@ -29,3 +29,8 @@ void AtomCommand::unexecute() {
 	m_newState = m_pAtom->clone();
 	m_pAtom->restore(m_oldState.get());
 }
+
+// 新增的实现
+IKAtomData* AtomCommand::getAtom() const {
+	return m_pAtom;
+}
