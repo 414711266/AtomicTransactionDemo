@@ -491,7 +491,26 @@ Document 对象和 DataLayer 对象是完全独立的两个实体。它们之间
 ###  4：自动化备份 (The "Atom" Magic)
 
 - 目标： 让对象在被修改时，能“自动”通知 DataLayer 并创建备份。这是整个框架的精髓所在。
-- 组件： 引入 IKAtomData 接口、"元数据前置"技巧 (__impl 宏)、_kso_WriteLockAtom。
+
+```C++
+// 理想中的 main.cpp (伪代码)
+int main() {
+    DataLayer dataLayer;
+    
+    // 创建一个 Document，并“告诉”它归 dataLayer 管理
+    auto doc = dataLayer.createObject<Document>(); 
+    
+    doc->setContent("版本1"); // 就像调用一个普通函数
+    doc->setContent("版本2"); // 再次调用
+    
+    // 这一切的背后，框架已经自动为我们创建了命令、执行了命令、加入了历史记录
+    
+    dataLayer.undo(); // 自动回滚到 "版本1"
+    dataLayer.redo(); // 自动前进到 "版本2"
+}
+```
+
+- 引入**原子对象**与**写时锁定**概念
 
 ###  5：实现完整的 Undo/Redo
 
