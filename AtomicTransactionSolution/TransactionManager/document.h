@@ -8,8 +8,7 @@
 class Document {
 public:
 	std::string content;
-	void print() const 
-	{
+	void print() const {
 		std::cout << "ÎÄµµÄÚÈÝ: \"" << content << "\"" << std::endl;
 	}
 };
