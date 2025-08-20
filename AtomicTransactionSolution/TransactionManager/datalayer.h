@@ -12,7 +12,7 @@ class IKAtomData; // 前向声明
 #define KSO_WRITE_LOCK_ATOM(pAtom) \
     (pAtom)->getDataLayer()->writeLockAtom(pAtom)
 
-// 通用数据层，我们的 Undo/Redo 管理器
+// 通用数据层，Undo/Redo 管理器
 class DataLayer {
 private:
 	std::vector<std::shared_ptr<Command>> m_history;
