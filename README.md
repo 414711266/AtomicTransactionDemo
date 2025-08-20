@@ -511,6 +511,308 @@ int main() {
 ```
 
 - 引入**原子对象**与**写时锁定**概念
+  - 原子对象是**最小可变更单元**的业务对象，它和 `DataLayer` 强绑定，任何对它的可写操作都被**拦截**并**事务化**，从而自动接入撤销/重做、版本控制、合并与广播通知。
+  - 任何写操作（如 `setContent`）的第1步，都会调用类似 `_kso_WriteLockAtom(this)` 的机制，**进入受控写上下文**
+
+#### command.h
+
+```C++
+#ifndef COMMAND_H
+#define COMMAND_H
+
+#include <memory>
+
+class DataLayer;
+
+// Command 接口: 定义了所有命令必须实现的行为
+class Command 
+{
+public:
+	virtual ~Command() = default;
+	virtual void execute() = 0; // 执行/重做
+	virtual void unexecute() = 0; // 撤销
+};
+
+// 原子对象的基类接口
+class IKAtomData
+{
+protected:
+	DataLayer* m_pDataLayer = nullptr;
+
+public:
+	virtual ~IKAtomData() = default;
+	void init(DataLayer* pLayer)
+	{
+		m_pDataLayer = pLayer; 
+	}
+	DataLayer* getDataLayer() const 
+	{
+		return m_pDataLayer; 
+	}
+
+	// 每个原子都必须能克隆自己，这是创建备忘录的关键
+	virtual std::shared_ptr<IKAtomData> clone() const = 0;
+	
+	// 每个原子都必须能从另一个克隆体中恢复状态
+	virtual void restore(const IKAtomData* pOther) = 0;
+};
+
+// 通用命令，不再是针对 Document 的
+// 省去了 ChangeContentCommand，取而代之的是一个通用的 AtomCommand
+class AtomCommand : public Command
+{
+private:
+	IKAtomData* m_pAtom; // 指向被修改的原子的指针 (裸指针)
+	std::shared_ptr<IKAtomData> m_oldState; // 修改前的状态 (备忘录)
+	std::shared_ptr<IKAtomData> m_newState; // 修改后的状态
+
+public:
+	AtomCommand(IKAtomData* pAtom, std::shared_ptr<IKAtomData> oldState);
+	void setNewState(std::shared_ptr<IKAtomData> newState);
+
+	void execute() override;
+	void unexecute() override;
+
+	// 新增：获取命令关联的原子
+	IKAtomData* getAtom() const;
+};
+#endif // COMMAND_H
+```
+
+#### command.cpp
+
+```C++
+// command.cpp
+#include "command.h"
+#include <iostream>
+
+AtomCommand::AtomCommand(IKAtomData* pAtom, std::shared_ptr<IKAtomData> oldState)
+	: m_pAtom(pAtom)
+	, m_oldState(std::move(oldState))
+{}
+
+// 这个方法在事务提交时被调用，用来捕获修改后的最终状态
+void AtomCommand::setNewState(std::shared_ptr<IKAtomData> newState)
+{
+	m_newState = std::move(newState);
+}
+
+void AtomCommand::execute()
+{
+	// 真实的 swap 逻辑会更高效，这里用 restore 模拟
+	// 在 commit 时，需要捕获新状态，这里简化处理
+	if (!m_newState)
+	{
+		// 在redo时，新状态是存在的。第一次执行是在业务代码里完成的
+		// 为了让redo能工作，我们需要在commit时捕获新状态
+		// 这是一个简化，在下一个迭代中，我们会引入更高效的Swap
+		m_newState = m_pAtom->clone();
+	}
+	std::cout << "命令: 执行/重做" << '\n';
+	m_pAtom->restore(m_newState.get());
+}
+
+void AtomCommand::unexecute()
+{
+	std::cout << "命令: 撤销" << '\n';
+	// 在撤销前，捕获当前状态作为未来的“新状态”
+	m_newState = m_pAtom->clone();
+	m_pAtom->restore(m_oldState.get());
+}
+
+// 新增的实现
+IKAtomData* AtomCommand::getAtom() const
+{
+	return m_pAtom;
+}
+```
+
+#### datalayer.h
+
+```C++
+// datalayer.h
+#ifndef DATALAYER_H
+#define DATALAYER_H
+
+#include <vector>
+#include <memory>
+
+class Command;
+class IKAtomData; // 前向声明
+
+// 宏，用于在原子对象的写方法中自动加锁
+#define KSO_WRITE_LOCK_ATOM(pAtom) \
+    (pAtom)->getDataLayer()->writeLockAtom(pAtom)
+
+// 通用数据层，我们的 Undo/Redo 管理器
+class DataLayer {
+private:
+	std::vector<std::shared_ptr<Command>> m_history;
+	int m_currentVersion; // 游标
+	bool m_inTransaction = false; // 是否在事务中
+	std::vector<std::shared_ptr<Command>> m_transCommands; // 临时存放事务中的命令
+
+public:
+	DataLayer(); // 构造函数
+
+	// 事务控制
+	void startTrans();
+	void commit();
+	void rollback(); // 回滚/取消事务
+
+	void addCommand(const std::shared_ptr<Command>& command);
+
+	void undo();
+	void redo();
+
+	// 核心：当原子对象需要被修改时，会调用这个函数
+	void writeLockAtom(IKAtomData* pAtom);
+
+	// 模板函数：用于创建与本 DataLayer 绑定的原子对象
+	template<typename T, typename... Args>
+	std::shared_ptr<T> createAtom(Args&&... args) {
+		auto pAtom = std::make_shared<T>(std::forward<Args>(args)...);
+		pAtom->init(this); // 将原子与 DataLayer 关联
+		return pAtom;
+	}
+};
+
+#endif // DATALAYER_H
+```
+
+#### datalayer.cpp
+
+```C++
+// datalayer.cpp
+#include "datalayer.h"
+#include "command.h" // 需要 Command 和 IKAtomData 的完整定义
+#include <algorithm> // for std::find_if
+#include <iostream>
+
+DataLayer::DataLayer()
+	: m_currentVersion(-1)
+{}
+
+void DataLayer::startTrans()
+{
+	m_inTransaction = true;
+	m_transCommands.clear();
+	std::cout << "数据层: 事务开始" << '\n';
+}
+
+void DataLayer::commit()
+{
+	if (!m_inTransaction) return;
+
+	if (!m_transCommands.empty())
+	{
+		// 如果在 undo 之后执行了新事务，清除所有未来的 redo 历史
+		if (m_currentVersion + 1 < m_history.size())
+		{
+			m_history.resize(m_currentVersion + 1);
+		}
+
+		// 多个命令可以合并成一个大的命令，这里为简化，直接将它们视为一个整体
+		// 此处我们直接把收集到的命令逐个（或打包成一个组合命令）加入历史
+		// 为了简单，我们只添加第一个命令作为代表
+		m_history.push_back(m_transCommands.front());
+		m_currentVersion++;
+		std::cout << "数据层: 事务提交。历史大小: " << m_history.size()
+			<< ", 当前版本: " << m_currentVersion << '\n';
+	}
+	else
+	{
+		std::cout << "数据层: 空事务，无需提交。" << '\n';
+	}
+
+	m_inTransaction = false;
+	m_transCommands.clear();
+}
+
+void DataLayer::rollback()
+{
+	if (!m_inTransaction) return;
+	// 回滚，用旧状态恢复所有被修改的原子
+	for (const auto& cmd : m_transCommands)
+	{
+		cmd->unexecute();
+	}
+	m_inTransaction = false;
+	m_transCommands.clear();
+	std::cout << "数据层: 事务回滚" << '\n';
+}
+
+void DataLayer::undo()
+{
+	if (m_currentVersion < 0)
+	{
+		std::cout << "数据层: 无法撤销，已在最初始状态。" << '\n';
+		return;
+	}
+	std::cout << "数据层: 正在撤销..." << '\n';
+	m_history[m_currentVersion]->unexecute();
+	m_currentVersion--;
+}
+
+void DataLayer::redo() {
+	if (m_currentVersion + 1 >= m_history.size())
+	{
+		std::cout << "数据层: 无法重做，已在最新状态。" << '\n';
+		return;
+	}
+	std::cout << "数据层: 正在重做..." << '\n';
+	m_currentVersion++;
+	m_history[m_currentVersion]->execute();
+}
+
+void DataLayer::writeLockAtom(IKAtomData* pAtom)
+{
+	if (!m_inTransaction)
+	{
+		std::cout << "警告: 在事务之外修改原子对象！" << '\n';
+		return; // 在严格模式下，这里应该抛出异常
+	}
+
+	// 检查这个原子在当前事务中是否已经被修改过
+	// 这里需要把 Command* 向下转型为 AtomCommand* 才能调用 getAtom
+	auto it = std::find_if(m_transCommands.begin(), m_transCommands.end(),
+		[&](const std::shared_ptr<Command>& cmd) -> bool
+		{ // 明确指定返回 bool
+			AtomCommand* pAtomCmd = dynamic_cast<AtomCommand*>(cmd.get());
+			if (pAtomCmd)
+			{
+				return pAtomCmd->getAtom() == pAtom; // 正确的比较和返回
+			}
+			return false;
+		});
+
+	if (it != m_transCommands.end())
+	{
+		// 已经为这个原子创建过命令了，直接返回
+		return;
+	}
+
+	// 这是此事务中第一次修改该原子
+	std::cout << "数据层: 原子被写入，创建备份..." << '\n';
+	auto oldState = pAtom->clone(); // 创建备忘录
+	auto cmd = std::make_shared<AtomCommand>(pAtom, oldState);
+	m_transCommands.push_back(cmd);
+}
+```
+
+#### 代码分析
+
+将各个功能都抽象出来了，其中`Command`是命令接口，派生出原子命令`AtomCommand`，原子命令中的数据由原子对象`IKAtomData`管理。
+
+在数据`DataLayer`中，管理command命令数组，并提供一个`writeLockAtom(IKAtomData* pAtom);`方法，确保原子对象的修改只能在事务（`startTrans()` 之后，`commit()`/`rollback()` 之前）中进行。
+
+`Document`具体的文档继承了`IKAtomData`，实现了`clone`与`restore`方法，
+
+在`DataLayer`中设置了开始事务与提交的方法，
+
+
+
+
 
 ###  5：实现完整的 Undo/Redo
 
