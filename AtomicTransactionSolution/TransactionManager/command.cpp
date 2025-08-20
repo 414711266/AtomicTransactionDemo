@@ -1,36 +1,43 @@
-// command.cpp
+ï»¿// command.cpp
 #include "command.h"
 #include <iostream>
 
 AtomCommand::AtomCommand(IKAtomData* pAtom, std::shared_ptr<IKAtomData> oldState)
-	: m_pAtom(pAtom), m_oldState(std::move(oldState)) {}
+	: m_pAtom(pAtom)
+	, m_oldState(std::move(oldState))
+{}
 
-// Õâ¸ö·½·¨ÔÚÊÂÎñÌá½»Ê±±»µ÷ÓÃ£¬ÓÃÀ´²¶»ñĞŞ¸ÄºóµÄ×îÖÕ×´Ì¬
-void AtomCommand::setNewState(std::shared_ptr<IKAtomData> newState) {
+// è¿™ä¸ªæ–¹æ³•åœ¨äº‹åŠ¡æäº¤æ—¶è¢«è°ƒç”¨ï¼Œç”¨æ¥æ•è·ä¿®æ”¹åçš„æœ€ç»ˆçŠ¶æ€
+void AtomCommand::setNewState(std::shared_ptr<IKAtomData> newState)
+{
 	m_newState = std::move(newState);
 }
 
-void AtomCommand::execute() {
-	// ÕæÊµµÄ swap Âß¼­»á¸ü¸ßĞ§£¬ÕâÀïÓÃ restore Ä£Äâ
-	// ÔÚ commit Ê±£¬ĞèÒª²¶»ñĞÂ×´Ì¬£¬ÕâÀï¼ò»¯´¦Àí
-	if (!m_newState) {
-		// ÔÚredoÊ±£¬ĞÂ×´Ì¬ÊÇ´æÔÚµÄ¡£µÚÒ»´ÎÖ´ĞĞÊÇÔÚÒµÎñ´úÂëÀïÍê³ÉµÄ
-		// ÎªÁËÈÃredoÄÜ¹¤×÷£¬ÎÒÃÇĞèÒªÔÚcommitÊ±²¶»ñĞÂ×´Ì¬
-		// ÕâÊÇÒ»¸ö¼ò»¯£¬ÔÚÏÂÒ»¸öµü´úÖĞ£¬ÎÒÃÇ»áÒıÈë¸ü¸ßĞ§µÄSwap
+void AtomCommand::execute()
+{
+	// çœŸå®çš„ swap é€»è¾‘ä¼šæ›´é«˜æ•ˆï¼Œè¿™é‡Œç”¨ restore æ¨¡æ‹Ÿ
+	// åœ¨ commit æ—¶ï¼Œéœ€è¦æ•è·æ–°çŠ¶æ€ï¼Œè¿™é‡Œç®€åŒ–å¤„ç†
+	if (!m_newState)
+	{
+		// åœ¨redoæ—¶ï¼Œæ–°çŠ¶æ€æ˜¯å­˜åœ¨çš„ã€‚ç¬¬ä¸€æ¬¡æ‰§è¡Œæ˜¯åœ¨ä¸šåŠ¡ä»£ç é‡Œå®Œæˆçš„
+		// ä¸ºäº†è®©redoèƒ½å·¥ä½œï¼Œæˆ‘ä»¬éœ€è¦åœ¨commitæ—¶æ•è·æ–°çŠ¶æ€
+		// è¿™æ˜¯ä¸€ä¸ªç®€åŒ–ï¼Œåœ¨ä¸‹ä¸€ä¸ªè¿­ä»£ä¸­ï¼Œæˆ‘ä»¬ä¼šå¼•å…¥æ›´é«˜æ•ˆçš„Swap
 		m_newState = m_pAtom->clone();
 	}
-	std::cout << "ÃüÁî: Ö´ĞĞ/ÖØ×ö" << std::endl;
+	std::cout << "å‘½ä»¤: æ‰§è¡Œ/é‡åš" << '\n';
 	m_pAtom->restore(m_newState.get());
 }
 
-void AtomCommand::unexecute() {
-	std::cout << "ÃüÁî: ³·Ïú" << std::endl;
-	// ÔÚ³·ÏúÇ°£¬²¶»ñµ±Ç°×´Ì¬×÷ÎªÎ´À´µÄ¡°ĞÂ×´Ì¬¡±
+void AtomCommand::unexecute()
+{
+	std::cout << "å‘½ä»¤: æ’¤é”€" << '\n';
+	// åœ¨æ’¤é”€å‰ï¼Œæ•è·å½“å‰çŠ¶æ€ä½œä¸ºæœªæ¥çš„â€œæ–°çŠ¶æ€â€
 	m_newState = m_pAtom->clone();
 	m_pAtom->restore(m_oldState.get());
 }
 
-// ĞÂÔöµÄÊµÏÖ
-IKAtomData* AtomCommand::getAtom() const {
+// æ–°å¢çš„å®ç°
+IKAtomData* AtomCommand::getAtom() const
+{
 	return m_pAtom;
 }

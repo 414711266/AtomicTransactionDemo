@@ -141,7 +141,7 @@
   <ItemGroup>
     <ClCompile Include="command.cpp" />
     <ClCompile Include="datalayer.cpp" />
-    <ClCompile Include="mian.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="command.h" />

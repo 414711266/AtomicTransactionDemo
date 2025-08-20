@@ -1,50 +1,46 @@
-// datalayer.h
+ï»¿// datalayer.h
 #ifndef DATALAYER_H
 #define DATALAYER_H
 
 #include <vector>
 #include <memory>
 
-// Ç°ÏòÉùÃ÷ Command£¬±ÜÃâÔÚÍ·ÎÄ¼şÖĞÒıÈë command.h
-// ÕâÊÇÒ»¸öÓÅ»¯£¬ÒòÎª DataLayer µÄ½Ó¿ÚÖ»ĞèÒªÖªµÀ Command ÊÇÒ»¸öÀàĞÍ£¬
-// ¶ø²»ĞèÒªÖªµÀËüµÄ¾ßÌåÊµÏÖ¡£Õâ¿ÉÒÔ¼õÉÙ±àÒëÒÀÀµ¡£
 class Command;
-class IKAtomData; // Ç°ÏòÉùÃ÷
+class IKAtomData; // å‰å‘å£°æ˜
 
-// ºê£¬ÓÃÓÚÔÚÔ­×Ó¶ÔÏóµÄĞ´·½·¨ÖĞ×Ô¶¯¼ÓËø
-// ÕâÊÇÕû¸ö×Ô¶¯»¯Ä§·¨µÄºËĞÄ£¡
+// å®ï¼Œç”¨äºåœ¨åŸå­å¯¹è±¡çš„å†™æ–¹æ³•ä¸­è‡ªåŠ¨åŠ é”
 #define KSO_WRITE_LOCK_ATOM(pAtom) \
-    (pAtom)->get_dataLayer()->writeLockAtom(pAtom)
+    (pAtom)->getDataLayer()->writeLockAtom(pAtom)
 
-// Í¨ÓÃÊı¾İ²ã£¬ÎÒÃÇµÄ Undo/Redo ¹ÜÀíÆ÷
+// é€šç”¨æ•°æ®å±‚ï¼Œæˆ‘ä»¬çš„ Undo/Redo ç®¡ç†å™¨
 class DataLayer {
 private:
 	std::vector<std::shared_ptr<Command>> m_history;
-	size_t m_currentVersion; // ÓÎ±ê
-	bool m_inTransaction = false; // ÊÇ·ñÔÚÊÂÎñÖĞ
-	std::vector<std::shared_ptr<Command>> m_transCommands; // ÁÙÊ±´æ·ÅÊÂÎñÖĞµÄÃüÁî
+	int m_currentVersion; // æ¸¸æ ‡
+	bool m_inTransaction = false; // æ˜¯å¦åœ¨äº‹åŠ¡ä¸­
+	std::vector<std::shared_ptr<Command>> m_transCommands; // ä¸´æ—¶å­˜æ”¾äº‹åŠ¡ä¸­çš„å‘½ä»¤
 
 public:
-	DataLayer(); // ¹¹Ôìº¯Êı
+	DataLayer(); // æ„é€ å‡½æ•°
 
-	// ÊÂÎñ¿ØÖÆ
+	// äº‹åŠ¡æ§åˆ¶
 	void startTrans();
 	void commit();
-	void rollback(); // »Ø¹ö/È¡ÏûÊÂÎñ
+	void rollback(); // å›æ»š/å–æ¶ˆäº‹åŠ¡
 
 	void addCommand(const std::shared_ptr<Command>& command);
 
 	void undo();
 	void redo();
 
-	// ºËĞÄ£ºµ±Ô­×Ó¶ÔÏóĞèÒª±»ĞŞ¸ÄÊ±£¬»áµ÷ÓÃÕâ¸öº¯Êı
+	// æ ¸å¿ƒï¼šå½“åŸå­å¯¹è±¡éœ€è¦è¢«ä¿®æ”¹æ—¶ï¼Œä¼šè°ƒç”¨è¿™ä¸ªå‡½æ•°
 	void writeLockAtom(IKAtomData* pAtom);
 
-	// Ä£°åº¯Êı£ºÓÃÓÚ´´½¨Óë±¾ DataLayer °ó¶¨µÄÔ­×Ó¶ÔÏó
+	// æ¨¡æ¿å‡½æ•°ï¼šç”¨äºåˆ›å»ºä¸æœ¬ DataLayer ç»‘å®šçš„åŸå­å¯¹è±¡
 	template<typename T, typename... Args>
 	std::shared_ptr<T> createAtom(Args&&... args) {
 		auto pAtom = std::make_shared<T>(std::forward<Args>(args)...);
-		pAtom->init(this); // ½«Ô­×ÓÓë DataLayer ¹ØÁª
+		pAtom->init(this); // å°†åŸå­ä¸ DataLayer å…³è”
 		return pAtom;
 	}
 };

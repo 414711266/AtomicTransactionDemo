@@ -1,43 +1,51 @@
-#ifndef COMMAND_H
+ï»¿#ifndef COMMAND_H
 #define COMMAND_H
 
-// #include "document.h"
-#include <string>
-#include <iostream>
-class DataLayer;
-class Document;
+#include <memory>
 
-// Command ½Ó¿Ú: ¶¨ÒåÁËËùÓĞÃüÁî±ØĞëÊµÏÖµÄĞĞÎª
-class Command {
+class DataLayer;
+
+// Command æ¥å£: å®šä¹‰äº†æ‰€æœ‰å‘½ä»¤å¿…é¡»å®ç°çš„è¡Œä¸º
+class Command 
+{
 public:
 	virtual ~Command() = default;
-	virtual void execute() = 0; // Ö´ĞĞ/ÖØ×ö
-	virtual void unexecute() = 0; // ³·Ïú
+	virtual void execute() = 0; // æ‰§è¡Œ/é‡åš
+	virtual void unexecute() = 0; // æ’¤é”€
 };
 
-// Ô­×Ó¶ÔÏóµÄ»ùÀà½Ó¿Ú
-class IKAtomData {
+// åŸå­å¯¹è±¡çš„åŸºç±»æ¥å£
+class IKAtomData
+{
 protected:
 	DataLayer* m_pDataLayer = nullptr;
 
 public:
 	virtual ~IKAtomData() = default;
-	void init(DataLayer* pLayer) { m_pDataLayer = pLayer; }
-	DataLayer* get_dataLayer() const { return m_pDataLayer; }
+	void init(DataLayer* pLayer)
+	{
+		m_pDataLayer = pLayer; 
+	}
+	DataLayer* getDataLayer() const 
+	{
+		return m_pDataLayer; 
+	}
 
-	// Ã¿¸öÔ­×Ó¶¼±ØĞëÄÜ¿ËÂ¡×Ô¼º£¬ÕâÊÇ´´½¨±¸ÍüÂ¼µÄ¹Ø¼ü
+	// æ¯ä¸ªåŸå­éƒ½å¿…é¡»èƒ½å…‹éš†è‡ªå·±ï¼Œè¿™æ˜¯åˆ›å»ºå¤‡å¿˜å½•çš„å…³é”®
 	virtual std::shared_ptr<IKAtomData> clone() const = 0;
-	// Ã¿¸öÔ­×Ó¶¼±ØĞëÄÜ´ÓÁíÒ»¸ö¿ËÂ¡ÌåÖĞ»Ö¸´×´Ì¬
+	
+	// æ¯ä¸ªåŸå­éƒ½å¿…é¡»èƒ½ä»å¦ä¸€ä¸ªå…‹éš†ä½“ä¸­æ¢å¤çŠ¶æ€
 	virtual void restore(const IKAtomData* pOther) = 0;
 };
 
-// Í¨ÓÃÃüÁî£¬²»ÔÙÊÇÕë¶Ô Document µÄ
-// Ê¡È¥ÁË ChangeContentCommand£¬È¡¶ø´úÖ®µÄÊÇÒ»¸öÍ¨ÓÃµÄ AtomCommand
-class AtomCommand : public Command {
+// é€šç”¨å‘½ä»¤ï¼Œä¸å†æ˜¯é’ˆå¯¹ Document çš„
+// çœå»äº† ChangeContentCommandï¼Œå–è€Œä»£ä¹‹çš„æ˜¯ä¸€ä¸ªé€šç”¨çš„ AtomCommand
+class AtomCommand : public Command
+{
 private:
-	IKAtomData* m_pAtom; // Ö¸Ïò±»ĞŞ¸ÄµÄÔ­×ÓµÄÖ¸Õë (ÂãÖ¸Õë)
-	std::shared_ptr<IKAtomData> m_oldState; // ĞŞ¸ÄÇ°µÄ×´Ì¬ (±¸ÍüÂ¼)
-	std::shared_ptr<IKAtomData> m_newState; // ĞŞ¸ÄºóµÄ×´Ì¬
+	IKAtomData* m_pAtom; // æŒ‡å‘è¢«ä¿®æ”¹çš„åŸå­çš„æŒ‡é’ˆ (è£¸æŒ‡é’ˆ)
+	std::shared_ptr<IKAtomData> m_oldState; // ä¿®æ”¹å‰çš„çŠ¶æ€ (å¤‡å¿˜å½•)
+	std::shared_ptr<IKAtomData> m_newState; // ä¿®æ”¹åçš„çŠ¶æ€
 
 public:
 	AtomCommand(IKAtomData* pAtom, std::shared_ptr<IKAtomData> oldState);
@@ -46,22 +54,22 @@ public:
 	void execute() override;
 	void unexecute() override;
 
-	// ĞÂÔö£º»ñÈ¡ÃüÁî¹ØÁªµÄÔ­×Ó
+	// æ–°å¢ï¼šè·å–å‘½ä»¤å…³è”çš„åŸå­
 	IKAtomData* getAtom() const;
 };
 
-// ConcreteCommand: ĞŞ¸ÄÎÄµµÄÚÈİµÄ¾ßÌåÃüÁî
-class ChangeContentCommand : public Command {
-private:
-	Document& m_doc;
-	std::string m_oldContent;
-	std::string m_newContent;
-
-public:
-	ChangeContentCommand(Document& doc, const std::string& newContent);
-
-	void execute() override;
-	void unexecute() override;
-};
+// ConcreteCommand: ä¿®æ”¹æ–‡æ¡£å†…å®¹çš„å…·ä½“å‘½ä»¤
+//class ChangeContentCommand : public Command {
+//private:
+//	Document& m_doc;
+//	std::string m_oldContent;
+//	std::string m_newContent;
+//
+//public:
+//	ChangeContentCommand(Document& doc, const std::string& newContent);
+//
+//	void execute() override;
+//	void unexecute() override;
+//};
 
 #endif // COMMAND_H

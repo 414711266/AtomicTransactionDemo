@@ -1,98 +1,115 @@
-// datalayer.cpp
+ï»¿// datalayer.cpp
 #include "datalayer.h"
-#include "command.h" // ĞèÒª Command ºÍ IKAtomData µÄÍêÕû¶¨Òå
+#include "command.h" // éœ€è¦ Command å’Œ IKAtomData çš„å®Œæ•´å®šä¹‰
 #include <algorithm> // for std::find_if
 #include <iostream>
 
-DataLayer::DataLayer() : m_currentVersion(-1) {}
+DataLayer::DataLayer()
+	: m_currentVersion(-1)
+{}
 
-void DataLayer::startTrans() {
+void DataLayer::startTrans()
+{
 	m_inTransaction = true;
 	m_transCommands.clear();
-	std::cout << "Êı¾İ²ã: ÊÂÎñ¿ªÊ¼" << std::endl;
+	std::cout << "æ•°æ®å±‚: äº‹åŠ¡å¼€å§‹" << '\n';
 }
 
-void DataLayer::commit() {
+void DataLayer::commit()
+{
 	if (!m_inTransaction) return;
 
-	if (!m_transCommands.empty()) {
-		// Èç¹ûÔÚ undo Ö®ºóÖ´ĞĞÁËĞÂÊÂÎñ£¬Çå³ıËùÓĞÎ´À´µÄ redo ÀúÊ·
-		if (m_currentVersion + 1 < m_history.size()) {
+	if (!m_transCommands.empty())
+	{
+		// å¦‚æœåœ¨ undo ä¹‹åæ‰§è¡Œäº†æ–°äº‹åŠ¡ï¼Œæ¸…é™¤æ‰€æœ‰æœªæ¥çš„ redo å†å²
+		if (m_currentVersion + 1 < m_history.size())
+		{
 			m_history.resize(m_currentVersion + 1);
 		}
 
-		// ¶à¸öÃüÁî¿ÉÒÔºÏ²¢³ÉÒ»¸ö´óµÄÃüÁî£¬ÕâÀïÎª¼ò»¯£¬Ö±½Ó½«ËüÃÇÊÓÎªÒ»¸öÕûÌå
-		// ´Ë´¦ÎÒÃÇÖ±½Ó°ÑÊÕ¼¯µ½µÄÃüÁîÖğ¸ö£¨»ò´ò°ü³ÉÒ»¸ö×éºÏÃüÁî£©¼ÓÈëÀúÊ·
-		// ÎªÁË¼òµ¥£¬ÎÒÃÇÖ»Ìí¼ÓµÚÒ»¸öÃüÁî×÷Îª´ú±í
+		// å¤šä¸ªå‘½ä»¤å¯ä»¥åˆå¹¶æˆä¸€ä¸ªå¤§çš„å‘½ä»¤ï¼Œè¿™é‡Œä¸ºç®€åŒ–ï¼Œç›´æ¥å°†å®ƒä»¬è§†ä¸ºä¸€ä¸ªæ•´ä½“
+		// æ­¤å¤„æˆ‘ä»¬ç›´æ¥æŠŠæ”¶é›†åˆ°çš„å‘½ä»¤é€ä¸ªï¼ˆæˆ–æ‰“åŒ…æˆä¸€ä¸ªç»„åˆå‘½ä»¤ï¼‰åŠ å…¥å†å²
+		// ä¸ºäº†ç®€å•ï¼Œæˆ‘ä»¬åªæ·»åŠ ç¬¬ä¸€ä¸ªå‘½ä»¤ä½œä¸ºä»£è¡¨
 		m_history.push_back(m_transCommands.front());
 		m_currentVersion++;
-		std::cout << "Êı¾İ²ã: ÊÂÎñÌá½»¡£ÀúÊ·´óĞ¡: " << m_history.size()
-			<< ", µ±Ç°°æ±¾: " << m_currentVersion << std::endl;
+		std::cout << "æ•°æ®å±‚: äº‹åŠ¡æäº¤ã€‚å†å²å¤§å°: " << m_history.size()
+			<< ", å½“å‰ç‰ˆæœ¬: " << m_currentVersion << '\n';
 	}
-	else {
-		std::cout << "Êı¾İ²ã: ¿ÕÊÂÎñ£¬ÎŞĞèÌá½»¡£" << std::endl;
+	else
+	{
+		std::cout << "æ•°æ®å±‚: ç©ºäº‹åŠ¡ï¼Œæ— éœ€æäº¤ã€‚" << '\n';
 	}
 
 	m_inTransaction = false;
 	m_transCommands.clear();
 }
 
-void DataLayer::rollback() {
+void DataLayer::rollback()
+{
 	if (!m_inTransaction) return;
-	// »Ø¹ö£¬ÓÃ¾É×´Ì¬»Ö¸´ËùÓĞ±»ĞŞ¸ÄµÄÔ­×Ó
-	for (const auto& cmd : m_transCommands) {
+	// å›æ»šï¼Œç”¨æ—§çŠ¶æ€æ¢å¤æ‰€æœ‰è¢«ä¿®æ”¹çš„åŸå­
+	for (const auto& cmd : m_transCommands)
+	{
 		cmd->unexecute();
 	}
 	m_inTransaction = false;
 	m_transCommands.clear();
-	std::cout << "Êı¾İ²ã: ÊÂÎñ»Ø¹ö" << std::endl;
+	std::cout << "æ•°æ®å±‚: äº‹åŠ¡å›æ»š" << '\n';
 }
 
-void DataLayer::undo() {
-	if (m_currentVersion < 0) {
-		std::cout << "Êı¾İ²ã: ÎŞ·¨³·Ïú£¬ÒÑÔÚ×î³õÊ¼×´Ì¬¡£" << std::endl;
+void DataLayer::undo()
+{
+	if (m_currentVersion < 0)
+	{
+		std::cout << "æ•°æ®å±‚: æ— æ³•æ’¤é”€ï¼Œå·²åœ¨æœ€åˆå§‹çŠ¶æ€ã€‚" << '\n';
 		return;
 	}
-	std::cout << "Êı¾İ²ã: ÕıÔÚ³·Ïú..." << std::endl;
+	std::cout << "æ•°æ®å±‚: æ­£åœ¨æ’¤é”€..." << '\n';
 	m_history[m_currentVersion]->unexecute();
 	m_currentVersion--;
 }
 
 void DataLayer::redo() {
-	if (m_currentVersion + 1 >= m_history.size()) {
-		std::cout << "Êı¾İ²ã: ÎŞ·¨ÖØ×ö£¬ÒÑÔÚ×îĞÂ×´Ì¬¡£" << std::endl;
+	if (m_currentVersion + 1 >= m_history.size())
+	{
+		std::cout << "æ•°æ®å±‚: æ— æ³•é‡åšï¼Œå·²åœ¨æœ€æ–°çŠ¶æ€ã€‚" << '\n';
 		return;
 	}
-	std::cout << "Êı¾İ²ã: ÕıÔÚÖØ×ö..." << std::endl;
+	std::cout << "æ•°æ®å±‚: æ­£åœ¨é‡åš..." << '\n';
 	m_currentVersion++;
 	m_history[m_currentVersion]->execute();
 }
 
-void DataLayer::writeLockAtom(IKAtomData* pAtom) {
-	if (!m_inTransaction) {
-		std::cout << "¾¯¸æ: ÔÚÊÂÎñÖ®ÍâĞŞ¸ÄÔ­×Ó¶ÔÏó£¡" << std::endl;
-		return; // ÔÚÑÏ¸ñÄ£Ê½ÏÂ£¬ÕâÀïÓ¦¸ÃÅ×³öÒì³£
+void DataLayer::writeLockAtom(IKAtomData* pAtom)
+{
+	if (!m_inTransaction)
+	{
+		std::cout << "è­¦å‘Š: åœ¨äº‹åŠ¡ä¹‹å¤–ä¿®æ”¹åŸå­å¯¹è±¡ï¼" << '\n';
+		return; // åœ¨ä¸¥æ ¼æ¨¡å¼ä¸‹ï¼Œè¿™é‡Œåº”è¯¥æŠ›å‡ºå¼‚å¸¸
 	}
 
-	// ¼ì²éÕâ¸öÔ­×ÓÔÚµ±Ç°ÊÂÎñÖĞÊÇ·ñÒÑ¾­±»ĞŞ¸Ä¹ı
-	// ÕâÀïĞèÒª°Ñ Command* ÏòÏÂ×ªĞÍÎª AtomCommand* ²ÅÄÜµ÷ÓÃ getAtom
+	// æ£€æŸ¥è¿™ä¸ªåŸå­åœ¨å½“å‰äº‹åŠ¡ä¸­æ˜¯å¦å·²ç»è¢«ä¿®æ”¹è¿‡
+	// è¿™é‡Œéœ€è¦æŠŠ Command* å‘ä¸‹è½¬å‹ä¸º AtomCommand* æ‰èƒ½è°ƒç”¨ getAtom
 	auto it = std::find_if(m_transCommands.begin(), m_transCommands.end(),
-		[&](const std::shared_ptr<Command>& cmd) -> bool { // Ã÷È·Ö¸¶¨·µ»Ø bool
+		[&](const std::shared_ptr<Command>& cmd) -> bool
+		{ // æ˜ç¡®æŒ‡å®šè¿”å› bool
 			AtomCommand* pAtomCmd = dynamic_cast<AtomCommand*>(cmd.get());
-			if (pAtomCmd) {
-				return pAtomCmd->getAtom() == pAtom; // ÕıÈ·µÄ±È½ÏºÍ·µ»Ø
+			if (pAtomCmd)
+			{
+				return pAtomCmd->getAtom() == pAtom; // æ­£ç¡®çš„æ¯”è¾ƒå’Œè¿”å›
 			}
 			return false;
 		});
 
-	if (it != m_transCommands.end()) {
-		// ÒÑ¾­ÎªÕâ¸öÔ­×Ó´´½¨¹ıÃüÁîÁË£¬Ö±½Ó·µ»Ø
+	if (it != m_transCommands.end())
+	{
+		// å·²ç»ä¸ºè¿™ä¸ªåŸå­åˆ›å»ºè¿‡å‘½ä»¤äº†ï¼Œç›´æ¥è¿”å›
 		return;
 	}
 
-	// ÕâÊÇ´ËÊÂÎñÖĞµÚÒ»´ÎĞŞ¸Ä¸ÃÔ­×Ó
-	std::cout << "Êı¾İ²ã: Ô­×Ó±»Ğ´Èë£¬´´½¨±¸·İ..." << std::endl;
-	auto oldState = pAtom->clone(); // ´´½¨±¸ÍüÂ¼
+	// è¿™æ˜¯æ­¤äº‹åŠ¡ä¸­ç¬¬ä¸€æ¬¡ä¿®æ”¹è¯¥åŸå­
+	std::cout << "æ•°æ®å±‚: åŸå­è¢«å†™å…¥ï¼Œåˆ›å»ºå¤‡ä»½..." << '\n';
+	auto oldState = pAtom->clone(); // åˆ›å»ºå¤‡å¿˜å½•
 	auto cmd = std::make_shared<AtomCommand>(pAtom, oldState);
 	m_transCommands.push_back(cmd);
 }

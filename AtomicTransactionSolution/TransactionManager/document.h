@@ -1,8 +1,9 @@
-// document.h
+ï»¿// document.h
 #ifndef DOCUMENT_H
 #define DOCUMENT_H
 
 #include <string>
+#include <iostream>
 #include "command.h"
 
 class Document : public IKAtomData {
@@ -12,25 +13,25 @@ private:
 public:
 	const std::string& getContent() const { return m_content; }
 
-	// "Ğ´"·½·¨
+	// "å†™"æ–¹æ³•
 	void setContent(const std::string& newContent) {
-		// ¹Ø¼üÒ»²½£ºÔÚĞŞ¸ÄÇ°£¬µ÷ÓÃºêÀ´Í¨Öª DataLayer
-		// Õâ»á´¥·¢±¸·İ²Ù×÷
-		KSO_WRITE_LOCK_ATOM(this);
+		// å…³é”®ä¸€æ­¥ï¼šåœ¨ä¿®æ”¹å‰ï¼Œè°ƒç”¨å®æ¥é€šçŸ¥ DataLayer
+		// è¿™ä¼šè§¦å‘å¤‡ä»½æ“ä½œ
+ 		KSO_WRITE_LOCK_ATOM(this);
 
 		m_content = newContent;
 	}
 
-	// ÊµÏÖ IKAtomData µÄ½Ó¿Ú
+	// å®ç° IKAtomData çš„æ¥å£
 	std::shared_ptr<IKAtomData> clone() const override {
-		// ´´½¨Ò»¸öĞÂµÄ Document ¸±±¾
+		// åˆ›å»ºä¸€ä¸ªæ–°çš„ Document å‰¯æœ¬
 		auto newDoc = std::make_shared<Document>();
 		newDoc->m_content = this->m_content;
 		return newDoc;
 	}
 
 	void restore(const IKAtomData* pOther) override {
-		// ´ÓÁíÒ»¸ö Document ×´Ì¬ÖĞ»Ö¸´
+		// ä»å¦ä¸€ä¸ª Document çŠ¶æ€ä¸­æ¢å¤
 		const Document* pOtherDoc = dynamic_cast<const Document*>(pOther);
 		if (pOtherDoc) {
 			this->m_content = pOtherDoc->m_content;
@@ -38,7 +39,7 @@ public:
 	}
 
 	void print() const {
-		std::cout << "ÎÄµµÄÚÈİ: \"" << m_content << "\"" << std::endl;
+		std::cout << "æ–‡æ¡£å†…å®¹: \"" << m_content << "\"" << '\n';
 	}
 };
 
